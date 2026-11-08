@@ -1,0 +1,20 @@
+groups:
+  - name: clinical_trial_agent_alerts
+    rules:
+      - alert: AgentDown
+        expr: up{job="clinical-trial-agent"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Clinical trial agent is down"
+          description: "The clinical-trial-agent target has been unreachable for more than 1 minute."
+
+      - alert: AgentHighErrorRate
+        expr: rate(http_requests_total{job="clinical-trial-agent", http_status=~"5.."}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Clinical trial agent high error rate"
+          description: "Agent error rate is above 5% for the last 2 minutes."

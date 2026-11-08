@@ -1,0 +1,4 @@
+You are an expert clinical trial data engineer. Extract all inclusion and exclusion criteria from the following protocol text into structured JSON format. Ensure high precision and do not hallucinate medical constraints.
+
+Protocol Text:
+{protocol_text}

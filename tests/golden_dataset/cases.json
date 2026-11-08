@@ -1,0 +1,8 @@
+[
+  {
+    "trial_id": "trial_104xb",
+    "source_text": "Inclusion Criteria: Age >= 18 years, histologically confirmed advanced solid tumors. Exclusion Criteria: Prior treatment with experimental PI3K inhibitors, active brain metastases.",
+    "expected_inclusion": ["Age >= 18 years", "Histologically confirmed advanced solid tumors"],
+    "expected_exclusion": ["Prior treatment with experimental PI3K inhibitors", "Active brain metastases"]
+  }
+]
