@@ -28,10 +28,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 COPY main.py .
 COPY src/ ./src/
-COPY protocols/ ./protocols/
+COPY data/protocols/ ./data/protocols/
 
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENTRYPOINT ["python", "main.py"]
-CMD ["--pdf", "protocols/trial_protocol_104xb.pdf"]
+CMD ["--pdf", "data/protocols/trial_protocol_104xb.pdf"][cite: 29]

@@ -1,188 +1,206 @@
-# LLMOps-Powered Clinical Trial Protocol Agent
+# LLMOps Clinical Trial Protocol Agent
 
-An asynchronous multi-tool agent framework built with **FastAPI**, **LangGraph**, **Pydantic**, **Anthropic Claude**, **ChromaDB**, and **Sentence Transformers** designed to parse dense clinical trial protocols, extract patient inclusion/exclusion criteria, enforce strict safety guardrails, evaluate output faithfulness, orchestrate **human-in-the-loop (HITL) clinical reviews**, stream production telemetry via **LLMOps**, and execute downstream AI-powered patient-trial eligibility matching through both a CLI and an interactive web UI.
+An enterprise-grade LLMOps pipeline and agentic system built with LangChain, LangGraph, and FastAPI designed for automated clinical trial protocol extraction, multi-stage validation, human-in-the-loop (HIL) review, and AI-driven patient matching.
 
 ---
 
-## Project Directory Structure
+## Project Structure
 
 ```text
-clinical_trial_protocol_agent/          # Project root folder & Virtual Environment
-  ├── .github/
-  │   └── workflows/
-  │       └── ci-cd.yml                 # GitHub Actions CI/CD pipeline automation
-  ├── protocols/                        # Directory for input clinical trial PDFs
-  ├── data/                             # Persistent storage directory
-  │   └── indexed_trials.json           # Saved structured clinical trial records
-  ├── src/                              # Source code package
-  │   ├── __init__.py
-  │   ├── schemas.py                    # Pydantic models & state definitions (`CriteriaExtractionOutput`, `ProtocolState`)
-  │   ├── prompts.py                    # Modular prompt templates & dynamic builders
-  │   ├── tools.py                      # PDF parsing (`pypdf`), Anthropic extraction, & ChromaDB vector search
-  │   ├── guardrails.py                 # Clinical boundary validation & input sanitisation
-  │   ├── evaluation.py                 # LLM-as-a-judge faithfulness scoring & LangSmith production telemetry
-  │   ├── database.py                   # Persistent JSON storage layer and keyword search engine
-  │   ├── matching_engine.py            # AI-powered patient eligibility evaluation using Claude & structured output
-  │   └── workflow.py                   # LangGraph stateful nodes, human review gating, and graph compilation
-  ├── .env                              # Environment variables (`ANTHROPIC_API_KEY`, `LANGCHAIN_API_KEY`, `LANGCHAIN_ENDPOINT`)
-  ├── .gitignore                        # Files to ignore
-  ├── Dockerfile                        # Multi-stage containerisation blueprint for production deployment
-  ├── requirements.txt                  # Project dependencies with version pinning & sentence-transformers
-  ├── run_agent.py                      # CLI entry point running Phase 1 (Extraction Workflow) & Phase 2 (Patient Matching)
-  ├── web_app.py                        # FastAPI web interface application for browser-based uploads, RAG execution, and HITL endpoints
-  ├── LICENSE                           # MIT License file
-  └── README.md                         # Project documentation
+llmops-clinical-trial-agent/
+├── .github/workflows/ci_cd.yml          # GitHub Actions CI/CD and evaluation gates
+├── configs/
+│   ├── alert.rules.yml                  # Prometheus alerting rules for agent health
+│   └── prometheus.yml                   # Prometheus metrics scrape configuration
+├── data/protocols/                      # Source clinical trial protocol documents
+├── prompts/                             # Extraction prompt templates (v1, v2)
+├── scripts/
+│   ├── generate_traffic.py              # Synthetic traffic generator for metrics testing
+│   ├── run_agent.py                     # CLI script for running end-to-end pipeline
+│   ├── test_pipeline.py                 # Unit tests for guardrails and evaluators
+│   └── web_app.py                       # FastAPI production server & HIL dashboard
+├── src/
+│   ├── data/indexed_trials.json         # Core trial data persistence store
+│   ├── database.py                      # Secure JSON database management layer
+│   ├── evaluation.py                    # Claude-powered faithfulness & QA evaluation
+│   ├── guardrails.py                    # Input sanitization and clinical boundary validation
+│   ├── matching_engine.py               # Patient eligibility matching against trial criteria
+│   ├── prompts.py                       # Dynamic prompt builder utilities
+│   ├── schemas.py                       # Pydantic data schemas & LangGraph state definitions
+│   ├── tools.py                         # PDF parser, OCR fallback, and ChromaDB RAG tooling
+│   └── workflow.py                      # LangGraph state machine orchestrator
+├── tests/
+│   ├── evals/run_eval.py                # Golden dataset automated evaluation runner
+│   └── golden_dataset/cases.json        # Ground-truth test cases for extraction accuracy
+├── docker-compose.yml                   # Prometheus & Grafana monitoring stack
+├── Dockerfile                           # Multi-stage production container build
+└── requirements.txt                     # Python dependencies
 
 ```
 
 ---
 
-## Key Components
+## Deep Architectural Breakdown & Data Flow
 
-* **`src/schemas.py`**: Defines the shared state schema (`ProtocolState` including `review_status` and `reviewer_notes`) and structured Pydantic models (`CriteriaExtractionOutput`, `PatientMatchOutput`).
-* **`src/prompts.py`**: Houses dynamic prompt engineering utilities and specialized baseline knowledge templates.
-* **`src/tools.py`**: Implements real PDF extraction via `pypdf`, criteria extraction using Anthropic's model via JSON schema structured outputs, and semantic similarity search over historical trial precedents using `ChromaDB`.
-* **`src/guardrails.py`**: Enforces clinical safety constraints, boundary checks, and input sanitisation to ensure patient safety and protocol adherence.
-* **`src/evaluation.py`**: Leverages Anthropic Claude as a judge to measure factual faithfulness, prevent hallucinations, and stream real-time tracing telemetry to **LangSmith**.
-* **`src/database.py`**: Handles persistent disk-based CRUD operations and fast keyword-based searching across indexed protocol criteria (`data/indexed_trials.json`).
-* **`src/matching_engine.py`**: Evaluates real patient profiles against stored trial protocols using Claude structured output to determine eligibility status, rationales, and violated criteria.
-* **`src/workflow.py`**: Configures the stateful LangGraph workflow, orchestrating execution from extraction through validation, automated self-correction, **human clinical review gating**, and automatic downstream database indexing.
-* **`web_app.py`**: FastAPI server providing browser-based upload endpoints (`/upload-and-analyze/`), pending review tracking (`/protocols/pending-reviews`), clinical sign-off processing (`/protocols/{trial_id}/review`), and interactive Swagger UI documentation.
-* **`Dockerfile`**: Provides a secure, optimised multi-stage Python runtime container image.
-* **`.github/workflows/ci-cd.yml`**: Automates multi-stage build tests and validation checks via GitHub Actions.
-* **`run_agent.py`**: The clean executable command-line interface entry point that runs the extraction pipeline (Phase 1) and immediately chains it into the AI patient-matching engine (Phase 2).
+The system operates as an end-to-end automated data engineering pipeline for clinical research, bridging document parsing, LLM-based extraction, human review gates, and patient matching.
 
----
+### 1. LangGraph Agent State Machine (`src/workflow.py`)
 
-## Advanced Architecture: Two-Phase Pipeline, Reflection & LLMOps Integration
+The pipeline execution is modeled as a deterministic state machine using LangGraph:
 
-The framework utilises an adaptive layout spanning protocol ingestion, web-based interaction, automated evaluation, and downstream clinical intelligence:
+* **Extractor Node (`extractor`):** Triggers document ingestion, OCR fallback when needed, vector embedding via HuggingFace, ChromaDB retrieval, and Anthropic Claude-powered structured extraction.
 
-### Phase 1: Ingestion, Self-Correction, Telemetry & Clinical Review Workflow
 
-1. **Therapeutic Specialisation & RAG:** The pipeline extracts text dynamically and pulls relevant historical context via ChromaDB.
-2. **Guardrails & Evaluation:** Extracted criteria are tested against clinical boundaries and checked for factual faithfulness while streaming traces to **LangSmith** (`LANGCHAIN_TRACING_V2=true`).
-3. **Self-Correction (Critique Loop):** If automated validation fails, LangGraph triggers a feedback loop back to the corrector node to re-prompt the LLM with error telemetry.
-4. **Human-in-the-Loop (HITL) Review:** Once automated checks pass, the workflow pauses at the `human_review` node (`PENDING_HUMAN_REVIEW`), allowing licensed clinicians to inspect and sign off on criteria via FastAPI endpoints.
-5. **Persistent Indexing:** Approved protocols are automatically committed to disk via `database.py`.
+* **Validator Node (`validator`):** Inspects extracted inclusion and exclusion criteria to ensure lists are populated and structurally sound.
 
-### Phase 2: AI Patient Eligibility Matching
 
-1. **Structured Retrieval:** Pulls verified and human-approved trial inclusion and exclusion rules from persistent storage.
-2. **LLM-Driven Screening:** Cross-references complex patient profiles against protocol specifications using Pydantic structured outputs to produce clear eligibility determinations, decision rationales, and violation flags.
+* **Human Review Node (`human_review`):** Evaluates extraction confidence and holds unverified or empty criteria in a pending state (`PENDING_HIL_REVIEW`) awaiting clinical sign-off.
 
----
 
-## LLMOps & Production Telemetry
+* **Indexer Node (`indexer`):** Persists approved structured criteria into the secure trial database so downstream patient matching engines can query them.
 
-Operating Large Language Models in production without an LLMOps infrastructure introduces critical vulnerabilities such as silent hallucinations, unmonitored costs, and compliance blind spots. This project incorporates robust **LLMOps** principles through **LangSmith** integration:
 
-* **Real-Time Tracing & Observability:** Every run, tool invocation, chunk retrieval, and LLM call is tracked and audited to eliminate blind spots.
-* **Automated Faithfulness Evaluation:** `src/evaluation.py` acts as an automated LLM-as-a-judge QA auditor verifying that extracted medical criteria strictly align with source documents.
-* **Regional Telemetry Routing:** Fully supports regional deployments (such as EU endpoints via `LANGCHAIN_ENDPOINT=https://eu.api.smith.langchain.com`) to satisfy strict data sovereignty requirements.
-* **Auditability & Compliance:** Creates an unshakeable audit trail required for regulatory oversight in clinical trials.
+
+### 2. RAG & Document Processing (`src/tools.py`)
+
+* Handles complex, multi-page clinical protocol PDFs by attempting direct text extraction via `pypdf`.
+
+
+* Automatically triggers an OCR fallback (`pdf2image` and `pytesseract`) if scanned pages lack extractable text.
+
+
+* Splits documents using `RecursiveCharacterTextSplitter`, computes local vector embeddings (`all-MiniLM-L6-v2`), and indexes chunks in **ChromaDB** for semantic retrieval.
+
+
+
+### 3. Guardrails & Faithfulness Evaluation (`src/guardrails.py`, `src/evaluation.py`)
+
+* **Sanitization & Clinical Boundaries:** Strips null bytes and control characters while scanning for ungrounded claims or hallucinated constraints (e.g., "cure-all" or "guaranteed" therapies).
+
+
+* **Production Evaluator:** Audits extracted criteria against source protocol text using Claude, computing confidence scores and detailed faithfulness critiques.
+
+
 
 ---
 
-## Getting Started
+## Human-in-the-Loop (HIL) Clinical Workflow
 
-### 1. Set Up the Virtual Environment (Local Development)
+To ensure regulatory compliance and medical accuracy, the FastAPI web application (`src/web_app.py`) provides an asynchronous review workflow:
+
+1. **Upload & Analysis:** Uploaded protocol PDFs (`/upload-and-analyze/`) run through the LangGraph pipeline.
+
+
+2. **Pending Queue:** If extractions require clinical verification, states are cached in an in-memory review dictionary (`PENDING_REVIEWS`).
+
+
+3. **Expert Sign-Off:** Clinical experts query pending reviews (`/protocols/pending-reviews`) and submit approvals or rejections (`/protocols/{trial_id}/review`) with custom reviewer notes. Approvals trigger downstream database indexing automatically.
+
+
+
+---
+
+## Observability & LLMOps Monitoring
+
+The application integrates production monitoring instrumentation:
+
+* **Prometheus Middleware:** Automatically records HTTP request counts (`http_requests_total`) and latency histograms (`http_request_duration_seconds`) across all endpoints.
+
+
+* **Scrape Endpoint:** Exposes metrics securely at `/metrics`.
+
+
+* **Alerting Rules (`configs/alert.rules.yml`):** Automatically triggers alerts if the `clinical-trial-agent` target goes down for over 1 minute or if the 5xx error rate exceeds 5% over a 2-minute window.
+
+
+* **Grafana & Prometheus Stack:** Easily spun up via Docker Compose for real-time visualization.
+
+
+
+---
+
+## Getting Started & Installation
+
+### Prerequisites & Setup
+
+Clone the repository and set up your virtual environment:
 
 ```bash
-python3.10 -m venv venv
-source venv/bin/activate  # On Windows
-pip install --upgrade pip
-
-```
-
-### 2. Install Dependencies
-
-```bash
+git clone https://github.com/your-org/llmops-clinical-trial-agent.git
+cd llmops-clinical-trial-agent
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-pip install fastapi uvicorn python-multipart python-dotenv
 
 ```
 
-### 3. Configure Environment Variables
-
-Create a root **`.env`** file and add your credentials and LLMOps configurations:
+Configure your `.env` file with required API keys and tracing configurations:
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-api03-...
-HF_TOKEN=hf_your_hugging_face_token_here
+ANTHROPIC_API_KEY=your_anthropic_api_key
+HF_TOKEN=your_huggingface_token
 LANGCHAIN_TRACING_V2=true
-LANGCHAIN_ENDPOINT=[https://eu.api.smith.langchain.com](https://eu.api.smith.langchain.com)
-LANGCHAIN_API_KEY=lsv2_pt_...
-LANGCHAIN_PROJECT=llmops-clinical-trial-agent
+LANGCHAIN_API_KEY=your_langsmith_api_key
 
 ```
 
-### 4. Run via Command Line (CLI)
+### Running the Pipeline via CLI
+
+Execute the end-to-end clinical protocol extraction and patient matching simulation:
 
 ```bash
-python run_agent.py --pdf protocols/trial_protocol_104xb.pdf
-
+python scripts/run_agent.py --pdf protocols/trial_protocol_104xb.pdf
 ```
 
-### 5. Run via Web Interface (FastAPI & HITL Review)
-
-Start the FastAPI server:
-
+### Launching the Web Server
+Start the FastAPI application:
 ```bash
-python web_app.py
-
+python scripts/web_app.py
 ```
-
-Then, open your browser and navigate to **`http://127.0.0.1:8000/docs`** to access the interactive Swagger UI where researchers can:
-
-* Upload protocol PDFs (`POST /upload-and-analyze/`)
-* Check pending clinical reviews (`GET /protocols/pending-reviews`)
-* Submit clinical approvals or rejections (`POST /protocols/{trial_id}/review`)
+* **Interactive API Docs:** `http://localhost:8000/docs`
+* **Prometheus Metrics:** `http://localhost:8000/metrics`
 
 ---
 
-## Production Deployment & Containerisation
+## 🐳 Docker & Monitoring Deployment
 
-To run the agent fully sandboxed inside a secure **Docker container**:
-
-### 1. Build the Docker Image
+Run the multi-stage container build or spin up the full observability stack with Docker Compose:
 
 ```bash
+# Build production container
 docker build -t clinical-trial-agent .
 
+# Spin up Prometheus and Grafana
+docker-compose up -d
 ```
 
-### 2. Run the Containerised Agent
-
-```bash
-docker run --rm --env-file .env clinical-trial-agent
-
-```
-
----
-
-## Future Roadmap
-
-To optimise the PENDING_HUMAN_REVIEW bottleneck over time, the human-in-the-loop gate will be used to collect a gold-standard dataset, which will then be used to deploy specialised AI agents that pre-screen the data before it ever reaches the human reviewer. Thus, the human reviewers will become more efficient, and the automation becomes more precise.
-
-When this data collection process runs over months, it will create a structured "Audit Trail and Feedback Dataset" of JSON objects containing the primary parts: the Context, the Discrepancy (Before vs. After), and the Root Cause.
-
-Once hundreds of these logs are collected, it will be possible to generate a Performance Dashboard powered by LLMOps telemetry that exposes systematic flaws in the primary extraction pipeline:
-
-### 1. The Error Heatmap
-
-A statistical breakdown showing exactly where the primary AI agent struggles.
-
-### 2. The Edge-Case Repository
-
-A curated list of highly complex medical paragraphs that the AI agent repeatedly misinterprets.
-
-### 3. The "Gold Standard" Evaluation Set
-
-A collection of 100% human-vetted protocol extractions.
+* **Prometheus UI:** `http://localhost:9090`
+* **Grafana Dashboard:** `http://localhost:3000` (Default credentials: `admin` / `admin`)
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the MIT License:
+
+```text
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
