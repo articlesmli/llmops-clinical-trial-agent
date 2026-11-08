@@ -1,5 +1,5 @@
-[
-  {
+{
+  "NCT_TEST_001": {
     "trial_id": "NCT_TEST_001",
     "title": "Test Clinical Protocol",
     "inclusion_criteria": [
@@ -8,5 +8,10 @@
     "exclusion_criteria": [
       "Prior malignancy within 5 years"
     ]
+  },
+  "NCT_104XB": {
+    "trial_id": "NCT_104XB",
+    "trial_title": "Clinical Trial Protocol 104XB",
+    "structured_criteria": {}
   }
-]
+}

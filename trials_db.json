@@ -1,0 +1,23 @@
+{
+  "NCT_104XB": {
+    "trial_id": "NCT_104XB",
+    "trial_title": "Clinical Trial Protocol 104XB",
+    "structured_criteria": {
+      "inclusion_criteria": [
+        "Adults (18 years old and above)",
+        "Confirmed HIV infection (including both antiretroviral (ART)-na\u00efve and experienced)",
+        "Admitted to the hospital (adult medical wards) at the time of enrolment"
+      ],
+      "exclusion_criteria": [
+        "Unable to provide informed consent (if no authorized relatives are in the position to provide the consent)",
+        "Living outside the catchment area of the participating hospital(s)",
+        "With plans to migrate outside the catchment area within 2 months after recruitment",
+        "Currently receiving anti-TB therapy or having received anti-TB therapy (or a TB diagnosis) in the last 6 months prior to enrolment",
+        "Currently receiving or having received preventive TB treatment in the preceding 6 months",
+        "Patients admitted for traumatic reasons, acute abdomen, delivery or pregnancy (maternal conditions) or for planned/scheduled surgery",
+        "Referred from other reference hospital",
+        "Positive result to a SARS-CoV-2 test (RT-PCR, antigen test, or other similar test that might define COVID-19 case in the study site), and patients under investigation for COVID-19 if this situation hinders the execution of study activities (as judged by the site PI)"
+      ]
+    }
+  }
+}

@@ -1,24 +1,22 @@
 # src/prompts.py
 
 def build_extraction_prompt(context_text: str, therapeutic_area: str = "General", historical_examples: str = "", **kwargs) -> str:
-    """Builds a robust dynamic prompt for extracting clinical trial inclusion and exclusion criteria."""
+    """Builds an explicit prompt ensuring non-empty clinical trial inclusion and exclusion criteria."""
     return f"""
     You are an expert clinical trial protocol analyzer specializing in {therapeutic_area}.
-    Review the protocol text below and extract clear, structured patient inclusion and exclusion criteria.
+    Carefully review the protocol text excerpt below and extract ALL patient inclusion and exclusion criteria. 
+    Do NOT leave the inclusion or exclusion criteria lists empty if criteria exist in the text.
 
     THERAPEUTIC AREA CONTEXT:
     {therapeutic_area}
-
-    HISTORICAL GUIDANCE/EXAMPLES:
-    {historical_examples if historical_examples else "None provided."}
 
     PROTOCOL TEXT EXCERPT:
     {context_text}
 
     Instructions:
-    - Extract specific, measurable inclusion criteria (e.g., age ranges, confirmed diagnoses, lab thresholds).
-    - Extract strict exclusion criteria (e.g., prior treatments, comorbidities, contraindications).
-    - Return output matching the requested schema.
+    - Extract concrete, specific inclusion criteria (e.g., age, diagnosis, stages, lab values).
+    - Extract strict exclusion criteria (e.g., prior treatments, comorbidities, exclusions).
+    - Return a valid JSON object matching the requested schema with populated lists.
     """
 
 
