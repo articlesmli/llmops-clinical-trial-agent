@@ -1,12 +1,17 @@
-# run_agent.py
+# scripts/run_agent.py
 import os
+import sys
 import json
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
+
+# Add parent directory to sys.path so 'src' can be imported cleanly
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.workflow import app
 from src.matching_engine import TrialMatchingEngine
 
-# Load environment variables (e.g., ANTHROPIC_API_KEY)
+# Load environment variables
 load_dotenv()
 
 def run_clinical_pipeline(pdf_path: str):
@@ -14,14 +19,14 @@ def run_clinical_pipeline(pdf_path: str):
     print("   CLINICAL TRIAL PROTOCOL AGENT PIPELINE         ")
     print("==================================================")
     
-    if os.getenv("ANTHROPIC_API_KEY") and "sk-ant" in os.getenv("ANTHROPIC_API_KEY", ""):
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if api_key and api_key.startswith("sk-") and len(api_key) > 10:
         print("[System] Anthropic API Key successfully loaded.")
     else:
         print("[System] Warning: Running in offline/fallback simulation mode.")
 
     print(f"[System] Target Protocol PDF: {pdf_path}\n")
 
-    # 1. Initialize the LangGraph workflow state
     initial_state = {
         "trial_id": "NCT_104XB",
         "trial_title": "Phase Protocol 104XB Evaluation",
@@ -37,11 +42,9 @@ def run_clinical_pipeline(pdf_path: str):
     final_state = app.invoke(initial_state)
     print(f"Workflow completed with compliance status: {final_state.get('compliance_status')}")
 
-    # 2. Run AI Patient Matching Engine against the indexed database
     print("\n=== Phase 2: Running AI Patient Matching Engine ===")
     matching_engine = TrialMatchingEngine()
     
-    # Sample mock patient profile to test eligibility
     sample_patient = {
         "age": 50,
         "diagnosis": "Solid tumor malignancy",
@@ -59,7 +62,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pdf", 
         type=str, 
-        default="protocols/trial_protocol_104xb.pdf",
+        default="data/protocols/trial_protocol_104xb.pdf",
         help="Path to the clinical trial protocol PDF file."
     )
     args = parser.parse_args()
