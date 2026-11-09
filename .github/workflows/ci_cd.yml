@@ -30,7 +30,7 @@ jobs:
           
       - name: Run Unit Tests
         run: |
-          python scripts/test_pipeline.py
+          PYTHONPATH=. python scripts/test_pipeline.py
 
   evaluation-gate:
     needs: code-quality-and-tests
@@ -53,7 +53,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           LANGCHAIN_TRACING_V2: false
         run: |
-          python tests/evals/run_eval.py
+          PYTHONPATH=. python tests/evals/run_eval.py
 
   build-and-push-docker:
     needs: evaluation-gate
