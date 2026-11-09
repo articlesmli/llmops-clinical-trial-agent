@@ -26,12 +26,12 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY main.py .
+COPY scripts/run_agent.py ./scripts/
 COPY src/ ./src/
 COPY data/protocols/ ./data/protocols/
 
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 
-ENTRYPOINT ["python", "main.py"]
+ENTRYPOINT ["python", "run_agent.py"]
 CMD ["--pdf", "data/protocols/trial_protocol_104xb.pdf"][cite: 29]
